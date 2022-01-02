@@ -1,0 +1,35 @@
+version: '3'
+
+volumes:
+  pg_data:
+
+services:
+  web:
+    build: .
+    command: bash -c "python manage.py runserver 0.0.0.0:8000"
+    container_name: ecommerce_app
+    restart: always
+    volumes: 
+      - .:/ecommerce_api
+    ports: 
+      - "8000:8000"
+    networks:
+      - ecommerce_net
+  postgres:
+    container_name: ecommerce_db
+    image: postgres
+    environment:
+      - POSTGRES_USER=ecommerce_user
+      - POSTGRES_PASSWORD=ecommerce_password
+      - PGDATA=/data/ecomerce_postgres
+    volumes:
+      - pg_data:/data/ecomerce_postgres
+    ports:
+      - 5434:5432
+    networks:
+      - ecommerce_net
+
+
+networks:
+  ecommerce_net:
+    driver: bridge
