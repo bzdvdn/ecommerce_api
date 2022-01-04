@@ -83,7 +83,7 @@ def create_product(
             'price': product_data['price'],
             'total_count': total_count,
             'total_availeble': total_count,
-            'descriptions': product_data['description'],
+            'description': product_data['description'],
         },
     )
     if not created:

@@ -36,7 +36,7 @@ class Product(models.Model):
     price = models.DecimalField(max_digits=5, decimal_places=2)
     total_availeble = models.PositiveIntegerField()
     total_count = models.PositiveIntegerField()
-    descriptions = models.TextField()
+    description = models.TextField()
 
     created_at = models.DateTimeField(auto_now=False, auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
