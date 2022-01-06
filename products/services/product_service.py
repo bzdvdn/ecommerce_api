@@ -55,7 +55,7 @@ def get_products(**search_kwargs) -> QuerySet:
     return qs
 
 
-def get_product(self, id_: int) -> Product:
+def get_product(id_: int) -> Product:
     qs = Product.objects.select_related("business", "category").prefetch_related(
         "product_images",
         "product_comments",
