@@ -1,5 +1,6 @@
 import graphene
-from ecommerce_api.permissions import paginate, is_authenticated
+from ecommerce_api.permissions import is_authenticated
+from ecommerce_api.pagination import paginate
 
 from .models import User, ImageUpload
 from .types import (

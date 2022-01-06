@@ -1,7 +1,7 @@
 from typing import Optional
 from django.db.models import QuerySet, Q
 from django.contrib.auth import get_user_model
-from ecommerce_api.permissions import get_query
+from ecommerce_api.services.base_service import get_query
 
 from ..models import Product, ProductImage, ProductComment, Wish, Cart, RequestCart
 

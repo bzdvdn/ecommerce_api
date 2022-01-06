@@ -1,5 +1,5 @@
 from .auth import Auth
-from .permissions import resolve_paginated
+from .pagination import resolve_paginated
 
 
 class CustomAuthMiddleware(object):

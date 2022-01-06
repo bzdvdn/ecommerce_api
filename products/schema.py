@@ -1,5 +1,5 @@
 import graphene
-from ecommerce_api.permissions import paginate, is_authenticated
+from ecommerce_api.pagination import paginate
 
 from .types import CategoryType, ProductType
 from .services import category_service, product_service

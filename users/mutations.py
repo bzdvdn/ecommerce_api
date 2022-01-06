@@ -1,11 +1,7 @@
 import graphene
-from datetime import datetime
-from django.contrib.auth import authenticate
-from ecommerce_api.auth import TokenManager
-from ecommerce_api.permissions import paginate, is_authenticated
+from ecommerce_api.permissions import is_authenticated
 from graphene_file_upload.scalars import Upload
 
-from .models import User, ImageUpload, UserProfile, UserAddress
 from .types import (
     UserType,
     ImageUploadType,
@@ -14,6 +10,7 @@ from .types import (
     UserProfileInput,
     AddressInput,
 )
+from .services import user_service, image_service
 
 
 class RegisterUser(graphene.Mutation):
@@ -27,7 +24,7 @@ class RegisterUser(graphene.Mutation):
         last_name = graphene.String(required=True)
 
     def mutate(self, info, email, password, **kwargs):
-        User.objects.create_user(email, password, **kwargs)
+        user_service.create_user(email, password, **kwargs)
 
         return RegisterUser(status=True, message="User created successfully")
 
@@ -42,17 +39,7 @@ class LoginUser(graphene.Mutation):
         password = graphene.String(required=True)
 
     def mutate(self, info, email, password):
-        user = authenticate(username=email, password=password)
-
-        if not user:
-            raise Exception("invalid credentials")
-
-        user.last_login = datetime.now()
-        user.save()
-
-        access = TokenManager.get_access({"user_id": user.id})
-        refresh = TokenManager.get_refresh({"user_id": user.id})
-
+        user, access, refresh = user_service.authenticate_user(email, password)
         return LoginUser(access=access, refresh=refresh, user=user)
 
 
@@ -63,12 +50,7 @@ class GetAccess(graphene.Mutation):
         refresh = graphene.String(required=True)
 
     def mutate(self, info, refresh):
-        token = TokenManager.decode_token(refresh)
-
-        if not token or token["type"] != "refresh":
-            raise Exception("Invalid token or has expired")
-
-        access = TokenManager.get_access({"user_id": token["user_id"]})
+        access = user_service.get_access_token_from_refresh(refresh)
 
         return GetAccess(access=access)
 
@@ -80,7 +62,7 @@ class ImageUploadMain(graphene.Mutation):
         image = Upload(required=True)
 
     def mutate(self, info, image):
-        image = ImageUpload.objects.create(image=image)
+        image = image_service.create_image_upload(image)
 
         return ImageUploadMain(image=image)
 
@@ -95,8 +77,8 @@ class CreateUserProfile(graphene.Mutation):
 
     @is_authenticated
     def mutate(self, info, profile_data, **kwargs):
-        user_profile = UserProfile.objects.create(
-            user_id=info.context.user.id, **profile_data, **kwargs
+        user_profile = user_service.create_user_profile(
+            info.context.user.id, profile_data, **kwargs
         )
 
         return CreateUserProfile(user_profile=user_profile)
@@ -112,16 +94,11 @@ class UpdateUserProfile(graphene.Mutation):
 
     @is_authenticated
     def mutate(self, info, profile_data, **kwargs):
-        try:
-            info.context.user.user_profile
-        except Exception:
-            raise Exception("You don't have a profile to update")
-
-        UserProfile.objects.filter(user_id=info.context.user.id).update(
-            **profile_data, **kwargs
+        user_profile = user_service.update_user_profile(
+            info.context.user, profile_data, **kwargs
         )
 
-        return UpdateUserProfile(user_profile=info.context.user.user_profile)
+        return UpdateUserProfile(user_profile=user_profile)
 
 
 class CreateUserAddress(graphene.Mutation):
@@ -133,18 +110,8 @@ class CreateUserAddress(graphene.Mutation):
 
     @is_authenticated
     def mutate(self, info, address_data, is_default=False):
-        try:
-            user_profile_id = info.context.user.user_profile.id
-        except Exception:
-            raise Exception("You need a profile to create an address")
-
-        existing_addresses = UserAddress.objects.filter(user_profile_id=user_profile_id)
-
-        if is_default:
-            existing_addresses.update(is_default=False)
-
-        address = UserAddress.objects.create(
-            user_profile_id=user_profile_id, is_default=is_default, **address_data
+        address = user_service.create_user_address(
+            info.context.user, address_data, is_default
         )
 
         return CreateUserAddress(address=address)
@@ -160,18 +127,11 @@ class UpdateUserAddress(graphene.Mutation):
 
     @is_authenticated
     def mutate(self, info, address_data, address_id, is_default=False):
-        profile_id = info.context.user.user_profile.id
-
-        UserAddress.objects.filter(user_profile_id=profile_id, id=address_id).update(
-            is_default=is_default, **address_data
+        address = user_service.update_user_address(
+            info.context.user, address_id, address_data, is_default
         )
 
-        if is_default:
-            UserAddress.objects.filter(user_profile_id=profile_id).exclude(
-                id=address_id
-            ).update(is_default=False)
-
-        return UpdateUserAddress(address=UserAddress.objects.get(id=address_id))
+        return UpdateUserAddress(address=address)
 
 
 class DeleteUserAddress(graphene.Mutation):
@@ -182,22 +142,7 @@ class DeleteUserAddress(graphene.Mutation):
 
     @is_authenticated
     def mutate(self, info, profile_id, address_id):
-        UserAddress.objects.filter(user_profile_id=profile_id, id=address_id).delete()
+        user_service.delete_user_address(profile_id, address_id)
 
         return DeleteUserAddress(status=True)
 
-
-class Query(graphene.ObjectType):
-    users = graphene.Field(paginate(UserType), page=graphene.Int())
-    image_uploads = graphene.Field(paginate(ImageUploadType), page=graphene.Int())
-    me = graphene.Field(UserType)
-
-    def resolve_users(self, info, **kwargs):
-        return User.objects.filter(**kwargs)
-
-    def resolve_image_uploads(self, info, **kwargs):
-        return ImageUpload.objects.filter(**kwargs)
-
-    @is_authenticated
-    def resolve_me(self, info):
-        return info.context.user
